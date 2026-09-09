@@ -1,10 +1,15 @@
 {
   "name": "@jaydb/cloud",
   "version": "0.1.0",
-  "description": "Frontend SDK for JayDB Cloud — zero-backend document database and identity platform",
+  "description": "Zero-dependency frontend SDK for JayDB Cloud — serverless document storage, optimistic concurrency (CAS), and OIDC PKCE authentication",
   "author": "JayDB Cloud",
   "license": "MIT",
   "type": "module",
+  "homepage": "https://jaydb.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaydb-cloud/jaydb-cloud-sdk.git"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -33,13 +38,16 @@
   "keywords": [
     "jaydb",
     "jaydb-cloud",
+    "sdk",
+    "frontend",
     "database",
-    "cas",
-    "etag",
-    "pkce",
-    "oidc",
     "serverless",
-    "sdk"
+    "oidc",
+    "pkce",
+    "cas",
+    "optimistic-concurrency",
+    "javascript",
+    "typescript"
   ],
   "devDependencies": {
     "esbuild": "^0.21.5",
