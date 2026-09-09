@@ -1,12 +1,14 @@
 /**
- * build.mjs — Zero-dependency build script for JayDB Cloud SDK.
+ * build.mjs — Build & Minification script for JayDB Cloud SDK.
  *
  * Generates:
  *   - dist/index.mjs (ESM entrypoint)
  *   - dist/index.cjs (CommonJS entrypoint)
  *   - dist/index.d.ts (TypeScript declarations)
- *   - dist/jaydb-cloud.esm.js (Standalone single-file ESM for direct browser import)
- *   - dist/jaydb-cloud.js (Standalone UMD/IIFE bundle with window.JayDBCloud)
+ *   - dist/jaydb-cloud.esm.js (Unminified standalone ESM bundle)
+ *   - dist/jaydb-cloud.esm.min.js (Minified standalone ESM bundle)
+ *   - dist/jaydb-cloud.js (Unminified UMD/IIFE bundle)
+ *   - dist/jaydb-cloud.min.js (Minified UMD/IIFE bundle)
  */
 
 import fs from 'node:fs';
@@ -20,116 +22,95 @@ const srcDir = path.resolve(rootDir, 'src');
 
 fs.mkdirSync(distDir, { recursive: true });
 
-// Read source files
-const errorsContent = fs.readFileSync(path.join(srcDir, 'errors.js'), 'utf8');
-const treeaclContent = fs.readFileSync(path.join(srcDir, 'treeacl.js'), 'utf8');
-const authContent = fs.readFileSync(path.join(srcDir, 'auth.js'), 'utf8');
-const clientContent = fs.readFileSync(path.join(srcDir, 'client.js'), 'utf8');
-const indexContent = fs.readFileSync(path.join(srcDir, 'index.js'), 'utf8');
-
-// 1. Copy TypeScript declarations
+// Copy TypeScript declarations
 const typesSrc = path.join(rootDir, 'types', 'index.d.ts');
 if (fs.existsSync(typesSrc)) {
   fs.copyFileSync(typesSrc, path.join(distDir, 'index.d.ts'));
 }
 
-// 2. Build standalone single-file ESM (concatenate modules without internal imports)
-function cleanImportsAndExports(code) {
-  return code
-    .replace(/^import\s+.*?;\s*$/gm, '')
-    .replace(/^export\s*\{\s*JayDBAuth\s+as\s+Auth\s*\}\s*;\s*$/gm, '')
-    .replace(/^export\s*\{\s*JayDBClient\s+as\s+JayDB\s*\}\s*;\s*$/gm, '');
+// Find esbuild (from local or sibling node_modules)
+let esbuild;
+try {
+  esbuild = (await import('esbuild')).default || (await import('esbuild'));
+} catch {
+  const fallbackPaths = [
+    path.resolve(rootDir, '../jaydb-cloud/web/node_modules/esbuild/lib/main.js'),
+    path.resolve(rootDir, 'node_modules/esbuild/lib/main.js'),
+  ];
+  for (const fp of fallbackPaths) {
+    if (fs.existsSync(fp)) {
+      esbuild = (await import(fp)).default || (await import(fp));
+      break;
+    }
+  }
 }
 
-const bundledBody = [
-  '// JayDB Cloud SDK — Standalone Bundle',
-  cleanImportsAndExports(errorsContent),
-  cleanImportsAndExports(treeaclContent),
-  cleanImportsAndExports(authContent),
-  cleanImportsAndExports(clientContent),
-  `
-export {
-  JayDBClient,
-  JayDBClient as JayDB,
-  JayDBAuth,
-  JayDBAuth as Auth,
-  TreeACL,
-  JayDBError,
-  ConflictError,
-  NotFoundError,
-  AuthError,
-  encodeKey,
-  unquoteETag,
-  beginLogin,
-  completeLoginIfCallback,
-  isSignedIn,
-  identityClaims,
-  ensureToken,
-  currentToken,
-  signOut,
-  signBoardInvite,
-  verifyBoardInvite,
-  b64url,
-  fromB64url
-};
-`,
-].join('\n');
+if (!esbuild) {
+  console.error('esbuild is required to build production distributions.');
+  process.exit(1);
+}
 
-fs.writeFileSync(path.join(distDir, 'jaydb-cloud.esm.js'), bundledBody, 'utf8');
-fs.writeFileSync(path.join(distDir, 'index.mjs'), bundledBody, 'utf8');
+const entryPoint = path.join(srcDir, 'index.js');
 
-// 3. Build UMD / IIFE bundle for <script src="...">
-const iifeBundle = `(function (root, factory) {
-  if (typeof define === 'function' && define.amd) {
-    define([], factory);
-  } else if (typeof module === 'object' && module.exports) {
-    module.exports = factory();
-  } else {
-    root.JayDBCloud = factory();
-    root.JayDB = root.JayDBCloud.JayDB;
-  }
-}(typeof self !== 'undefined' ? self : this, function () {
-  'use strict';
+// 1. Build ESM bundles
+await esbuild.build({
+  entryPoints: [entryPoint],
+  bundle: true,
+  format: 'esm',
+  outfile: path.join(distDir, 'jaydb-cloud.esm.js'),
+  target: ['es2022'],
+  sourcemap: true,
+});
 
-  ${cleanImportsAndExports(errorsContent).replace(/^export\s+/gm, '')}
-  ${cleanImportsAndExports(treeaclContent).replace(/^export\s+/gm, '')}
-  ${cleanImportsAndExports(authContent).replace(/^export\s+/gm, '')}
-  ${cleanImportsAndExports(clientContent).replace(/^export\s+/gm, '')}
+await esbuild.build({
+  entryPoints: [entryPoint],
+  bundle: true,
+  format: 'esm',
+  minify: true,
+  outfile: path.join(distDir, 'jaydb-cloud.esm.min.js'),
+  target: ['es2022'],
+  sourcemap: true,
+});
 
-  return {
-    JayDBClient: JayDBClient,
-    JayDB: JayDBClient,
-    JayDBAuth: JayDBAuth,
-    Auth: JayDBAuth,
-    TreeACL: TreeACL,
-    JayDBError: JayDBError,
-    ConflictError: ConflictError,
-    NotFoundError: NotFoundError,
-    AuthError: AuthError,
-    encodeKey: encodeKey,
-    unquoteETag: unquoteETag,
-    beginLogin: beginLogin,
-    completeLoginIfCallback: completeLoginIfCallback,
-    isSignedIn: isSignedIn,
-    identityClaims: identityClaims,
-    ensureToken: ensureToken,
-    currentToken: currentToken,
-    signOut: signOut,
-    signBoardInvite: signBoardInvite,
-    verifyBoardInvite: verifyBoardInvite,
-    b64url: b64url,
-    fromB64url: fromB64url
-  };
-}));
-`;
+// Copy to index.mjs for package.json exports
+fs.copyFileSync(path.join(distDir, 'jaydb-cloud.esm.js'), path.join(distDir, 'index.mjs'));
 
-fs.writeFileSync(path.join(distDir, 'jaydb-cloud.js'), iifeBundle, 'utf8');
-fs.writeFileSync(path.join(distDir, 'index.cjs'), iifeBundle, 'utf8');
+// 2. Build IIFE / UMD bundles (global window.JayDBCloud)
+await esbuild.build({
+  entryPoints: [entryPoint],
+  bundle: true,
+  format: 'iife',
+  globalName: 'JayDBCloud',
+  outfile: path.join(distDir, 'jaydb-cloud.js'),
+  target: ['es2022'],
+  sourcemap: true,
+});
+
+await esbuild.build({
+  entryPoints: [entryPoint],
+  bundle: true,
+  format: 'iife',
+  globalName: 'JayDBCloud',
+  minify: true,
+  outfile: path.join(distDir, 'jaydb-cloud.min.js'),
+  target: ['es2022'],
+  sourcemap: true,
+});
+
+// 3. Build CommonJS bundle
+await esbuild.build({
+  entryPoints: [entryPoint],
+  bundle: true,
+  format: 'cjs',
+  outfile: path.join(distDir, 'index.cjs'),
+  target: ['node18'],
+  sourcemap: true,
+});
 
 console.log('Build completed successfully!');
-console.log('Generated:');
-console.log('  - dist/index.mjs');
-console.log('  - dist/index.cjs');
-console.log('  - dist/index.d.ts');
-console.log('  - dist/jaydb-cloud.esm.js');
-console.log('  - dist/jaydb-cloud.js');
+console.log('Generated in dist/:');
+const files = fs.readdirSync(distDir);
+for (const file of files) {
+  const stats = fs.statSync(path.join(distDir, file));
+  console.log(`  - ${file.padEnd(26)} ${(stats.size / 1024).toFixed(2)} KB`);
+}
