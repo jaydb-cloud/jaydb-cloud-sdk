@@ -1,0 +1,47 @@
+{
+  "name": "@jaydb/cloud",
+  "version": "0.1.0",
+  "description": "Frontend SDK for JayDB Cloud — zero-backend document database and identity platform",
+  "author": "JayDB Cloud",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./browser": {
+      "import": "./dist/jaydb-cloud.esm.js",
+      "default": "./dist/jaydb-cloud.esm.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "jaydb",
+    "jaydb-cloud",
+    "database",
+    "cas",
+    "etag",
+    "pkce",
+    "oidc",
+    "serverless",
+    "sdk"
+  ],
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
