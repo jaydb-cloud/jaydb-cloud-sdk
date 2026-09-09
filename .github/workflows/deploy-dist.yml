@@ -45,15 +45,17 @@ jobs:
           path: dist/
 
       - name: Configure GitHub Pages
+        id: pages-config
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
+        continue-on-error: true
 
       - name: Upload Pages artifact
+        if: steps.pages-config.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
       - name: Deploy to GitHub Pages
+        if: steps.pages-config.outcome == 'success'
         id: deployment
         uses: actions/deploy-pages@v4
