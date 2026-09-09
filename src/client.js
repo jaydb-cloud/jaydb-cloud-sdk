@@ -36,23 +36,22 @@ export class JayDBClient {
    * @param {object} opts
    * @param {string} opts.baseUrl - Tenant origin, e.g. "https://acme.jaydb.com"
    * @param {string} opts.namespace - Namespace name, e.g. "default"
-   * @param {string} [opts.apiKey] - Secret or public API key (sent as X-JayDB-API-Key)
+   * @param {import('./auth.js').JayDBAuth} [opts.auth] - JayDBAuth instance managing the OIDC PKCE session
    * @param {function} [opts.getToken] - Sync or async `() => string | null` returning an access token
-   * @param {import('./auth.js').JayDBAuth} [opts.auth] - Auth client instance
+   * @param {string} [opts.token] - Static access token string
    * @param {typeof fetch} [opts.fetch] - Custom fetch implementation
    */
-  constructor({ baseUrl, namespace, apiKey, getToken, auth, fetch: customFetch }) {
+  constructor({ baseUrl, namespace, auth, getToken, token, fetch: customFetch } = {}) {
     if (!baseUrl) throw new Error('jaydb: baseUrl is required');
     if (!namespace) throw new Error('jaydb: namespace is required');
-    if (!apiKey && !getToken && !auth) {
-      throw new Error('jaydb: apiKey, getToken, or auth is required');
+    if (!auth && !getToken && !token) {
+      throw new Error('jaydb: auth, getToken, or token is required for OIDC authentication');
     }
 
     this.baseUrl = String(baseUrl).replace(/\/+$/, '');
     this.namespace = namespace;
-    this.apiKey = apiKey ?? null;
-    this.getToken = getToken ?? null;
     this.auth = auth ?? null;
+    this.getToken = getToken ?? (token ? () => token : null);
     this.fetch = customFetch || (typeof globalThis !== 'undefined' ? globalThis.fetch.bind(globalThis) : null);
 
     if (!this.fetch) {
@@ -78,7 +77,7 @@ export class JayDBClient {
   #warned;
 
   /**
-   * Build authentication headers. A Bearer token takes precedence over an API key.
+   * Build authentication headers using the OIDC Bearer token.
    */
   async #authHeaders() {
     if (this.auth && typeof this.auth.getToken === 'function') {
@@ -88,9 +87,6 @@ export class JayDBClient {
     if (this.getToken) {
       const token = await this.getToken();
       if (token) return { Authorization: `Bearer ${token}` };
-    }
-    if (this.apiKey) {
-      return { 'X-JayDB-API-Key': this.apiKey };
     }
     return {};
   }

@@ -45,12 +45,17 @@ No build tools or node_modules needed! Import the standalone ESM bundle directly
 
 ```html
 <script type="module">
-  import { JayDB, Auth } from './jaydb-cloud.esm.js';
+  import { JayDB, Auth } from './jaydb-cloud.esm.min.js';
+
+  const auth = new Auth({
+    issuer: 'https://your-tenant.jaydb.com',
+    clientId: 'my-app',
+  });
 
   const db = new JayDB({
     baseUrl: 'https://your-tenant.jaydb.com',
     namespace: 'default',
-    apiKey: 'jcloud_sec_your_key',
+    auth,
   });
 
   const doc = await db.get('settings/theme');
@@ -71,38 +76,14 @@ No build tools or node_modules needed! Import the standalone ESM bundle directly
 
 ## 🚀 Quick Start (60 Seconds)
 
-### Scenario A: Connect with an API Key
+### User Sign-In with OIDC + PKCE (Frontend-Only Auth)
 
-Ideal for public read-only apps, internal dashboards, or rapid prototyping:
-
-```javascript
-import { JayDB } from '@jaydb/cloud';
-
-const db = new JayDB({
-  baseUrl: 'https://acme.jaydb.com',
-  namespace: 'production',
-  apiKey: 'jcloud_sec_live_example123',
-});
-
-// 1. Write a document
-await db.put('users/101', { name: 'Alice', role: 'engineer' });
-
-// 2. Read it back
-const doc = await db.get('users/101');
-console.log(doc.data); // { name: 'Alice', role: 'engineer' }
-console.log(doc.etag); // e.g. "9a2f1c84..."
-```
-
----
-
-### Scenario B: User Sign-In with OIDC + PKCE (Frontend-Only Auth)
-
-Let each user sign in with their own identity (Google, GitHub, Microsoft). The SDK automatically manages token exchange, token storage, and background silent refresh:
+Let each user sign in with their own identity (Google, GitHub, Microsoft). The SDK handles the PKCE authorization flow, token exchange, secure storage, and automatic silent token refresh:
 
 ```javascript
 import { JayDB, Auth } from '@jaydb/cloud';
 
-// 1. Initialize Auth
+// 1. Initialize Auth with tenant issuer and public client ID
 const auth = new Auth({
   issuer: 'https://acme.jaydb.com',
   clientId: 'my-kanban-app',
@@ -112,7 +93,7 @@ const auth = new Auth({
 const db = new JayDB({
   baseUrl: 'https://acme.jaydb.com',
   namespace: 'production',
-  auth, // All database calls automatically send `Authorization: Bearer <token>`
+  auth, // All requests automatically include `Authorization: Bearer <token>`
 });
 
 // 3. Handle login callback when returning from Identity Provider
@@ -125,6 +106,24 @@ if (new URL(window.location.href).searchParams.has('code')) {
 document.getElementById('login-google-btn').onclick = () => {
   auth.signIn({ idp: 'google', context: { currentBoard: 'roadmap' } });
 };
+
+// 5. Read and write documents with user-scoped permissions
+const doc = await db.get('cards/task-101');
+await db.put('cards/task-101', { ...doc?.data, status: 'done' });
+```
+
+---
+
+### Custom or External OIDC Integration
+
+If you manage tokens through an external identity provider or custom session manager, pass a `getToken` function:
+
+```javascript
+const db = new JayDB({
+  baseUrl: 'https://acme.jaydb.com',
+  namespace: 'production',
+  getToken: async () => (await auth0.getTokenSilently()),
+});
 ```
 
 ---
@@ -262,7 +261,7 @@ interface UserProfile {
   theme: 'light' | 'dark';
 }
 
-const db = new JayDB({ baseUrl, namespace, apiKey });
+const db = new JayDB({ baseUrl, namespace, auth });
 
 // Typed GET
 const doc = await db.get<UserProfile>('users/alice');

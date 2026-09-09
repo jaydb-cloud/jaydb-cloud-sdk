@@ -30,7 +30,7 @@ test('JayDBClient constructor requires baseUrl and namespace', () => {
   assert.throws(() => new JayDBClient({ baseUrl: 'https://test.jaydb.com' }), /namespace is required/);
   assert.throws(
     () => new JayDBClient({ baseUrl: 'https://test.jaydb.com', namespace: 'test' }),
-    /apiKey, getToken, or auth is required/,
+    /auth, getToken, or token is required for OIDC authentication/,
   );
 });
 
@@ -38,7 +38,7 @@ test('JayDBClient GET document with mock fetch', async () => {
   const mockFetch = async (url, opts) => {
     assert.equal(url, 'https://test.jaydb.com/v1/n/demo/docs/cards/c1');
     assert.equal(opts.method, 'GET');
-    assert.equal(opts.headers['X-JayDB-API-Key'], 'test-api-key');
+    assert.equal(opts.headers['Authorization'], 'Bearer test-token');
 
     return {
       ok: true,
@@ -51,7 +51,7 @@ test('JayDBClient GET document with mock fetch', async () => {
   const client = new JayDB({
     baseUrl: 'https://test.jaydb.com',
     namespace: 'demo',
-    apiKey: 'test-api-key',
+    token: 'test-token',
     fetch: mockFetch,
   });
 
@@ -76,7 +76,7 @@ test('JayDBClient GET returns null on 404', async () => {
   const client = new JayDB({
     baseUrl: 'https://test.jaydb.com',
     namespace: 'demo',
-    apiKey: 'test-key',
+    token: 'test-token',
     fetch: mockFetch,
   });
 
@@ -99,7 +99,7 @@ test('JayDBClient PUT handles If-Match and ConflictError (412)', async () => {
   const client = new JayDB({
     baseUrl: 'https://test.jaydb.com',
     namespace: 'demo',
-    apiKey: 'test-key',
+    token: 'test-token',
     fetch: mockFetch,
   });
 
@@ -126,7 +126,7 @@ test('JayDBClient PUT handles createOnly (If-None-Match: *)', async () => {
   const client = new JayDB({
     baseUrl: 'https://test.jaydb.com',
     namespace: 'demo',
-    apiKey: 'test-key',
+    token: 'test-token',
     fetch: mockFetch,
   });
 
@@ -149,7 +149,7 @@ test('JayDBClient DELETE returns true on 200 and false on 404', async () => {
   const client = new JayDB({
     baseUrl: 'https://test.jaydb.com',
     namespace: 'demo',
-    apiKey: 'test-key',
+    token: 'test-token',
     fetch: mockFetch,
   });
 
@@ -189,7 +189,7 @@ test('JayDBClient list and listAll iterates pages correctly', async () => {
   const client = new JayDB({
     baseUrl: 'https://test.jaydb.com',
     namespace: 'demo',
-    apiKey: 'test-key',
+    token: 'test-token',
     fetch: mockFetch,
   });
 

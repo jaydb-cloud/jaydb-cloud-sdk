@@ -17,9 +17,9 @@ export interface ClientStats {
 export interface JayDBClientOptions {
   baseUrl: string;
   namespace: string;
-  apiKey?: string | null;
-  getToken?: (() => string | null | Promise<string | null>) | null;
   auth?: JayDBAuth | null;
+  getToken?: (() => string | null | Promise<string | null>) | null;
+  token?: string | null;
   fetch?: typeof fetch;
 }
 
@@ -90,9 +90,8 @@ export class AuthError extends JayDBError {}
 export class JayDBClient {
   baseUrl: string;
   namespace: string;
-  apiKey: string | null;
-  getToken: (() => string | null | Promise<string | null>) | null;
   auth: JayDBAuth | null;
+  getToken: (() => string | null | Promise<string | null>) | null;
   stats: ClientStats;
 
   constructor(opts: JayDBClientOptions);
