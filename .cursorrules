@@ -1,0 +1,149 @@
+# JayDB Cloud — Zero-Backend Application Architecture Rules
+
+You are an expert AI software engineer building modern, production-grade web applications with **Zero Backend Servers**.
+
+## Core Philosophy: Ship Apps with No Backend at All
+- **No Backend Required**: Do NOT scaffold Express, FastAPI, NestJS, Go, or serverless function backends for basic data and authentication needs unless the user explicitly requests a custom server.
+- **Frontend-Only**: The entire application consists of static client files (React, Vite, Next.js static export, Svelte, Vue, or Vanilla HTML/JS) hosted on GitHub Pages, Cloudflare Pages, Vercel, or S3.
+- **JayDB Cloud handles both Identity and Database**: The browser communicates directly with JayDB Cloud using the official `@jaydb/cloud` SDK.
+
+---
+
+## 1. Authentication (OIDC + PKCE)
+- **Zero Client Secrets**: Never store or require API secrets in frontend code.
+- **Tenant Issuer**: The issuer is `https://<org>.jaydb.com`.
+- **Public Client ID**: The app registration client ID configured in JayDB Cloud console.
+- **Flow**:
+  ```javascript
+  import { JayDB, Auth } from '@jaydb/cloud';
+
+  const auth = new Auth({
+    issuer: 'https://acme.jaydb.com',
+    clientId: 'my-web-app',
+  });
+
+  // Check login callback on app load
+  if (window.location.search.includes('code=')) {
+    await auth.handleCallback();
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  // Sign In triggers redirect with PKCE
+  function login(idp = 'google') {
+    auth.signIn({ idp }); // 'google' | 'github' | 'microsoft'
+  }
+
+  function logout() {
+    auth.signOut();
+  }
+  ```
+
+---
+
+## 2. Database & Data Modeling
+- **Connect Database to Auth**: Pass `auth` to the `JayDB` client. It automatically attaches `Authorization: Bearer <jwt>` to all requests.
+  ```javascript
+  const db = new JayDB({
+    baseUrl: 'https://acme.jaydb.com',
+    namespace: 'production',
+    auth,
+  });
+  ```
+- **Document Key Hierarchy**: Use intuitive, REST-like URI paths:
+  - `users/{userId}/profile`
+  - `boards/{boardId}/metadata`
+  - `boards/{boardId}/cards/{cardId}`
+  - `chats/{channelId}/messages/{msgId}`
+
+---
+
+## 3. Concurrency & CAS (Compare-And-Swap)
+JayDB uses HTTP ETags for lock-free optimistic concurrency control. Always adhere to these rules:
+
+1. **Creating a new item**: Always use `createOnly: true` (sends `If-None-Match: *`) to guarantee you do not overwrite existing items.
+   ```javascript
+   await db.put('boards/proj-1/cards/c101', {
+     title: 'New Card',
+     status: 'todo',
+     createdAt: new Date().toISOString(),
+   }, { createOnly: true });
+   ```
+
+2. **Updating shared state**: Always pass `ifMatch: doc.etag` to prevent silent overwrites. Always handle `ConflictError` by re-reading:
+   ```javascript
+   import { ConflictError } from '@jaydb/cloud';
+
+   async function updateCardWithRetry(cardKey, updater, maxRetries = 3) {
+     for (let attempt = 0; attempt < maxRetries; attempt++) {
+       const doc = await db.get(cardKey);
+       if (!doc) throw new Error('Document not found');
+
+       const updatedData = updater(doc.data);
+
+       try {
+         const newMeta = await db.put(cardKey, updatedData, {
+           ifMatch: doc.etag,
+         });
+         return { data: updatedData, etag: newMeta.etag };
+       } catch (err) {
+         if (err instanceof ConflictError) {
+           console.warn('Concurrent write detected, retrying...');
+           continue; // re-read and retry
+         }
+         throw err;
+       }
+     }
+     throw new Error('Failed to update due to high contention');
+   }
+   ```
+
+3. **Deleting an item**:
+   ```javascript
+   await db.delete('boards/proj-1/cards/c101', { ifMatch: currentEtag });
+   ```
+
+---
+
+## 4. Querying & Pagination
+- JayDB is a document database with key and prefix access.
+- List items with `db.list({ prefix, limit })` or `db.listAll({ prefix })`.
+- Remember: `list` returns metadata (`key`, `etag`, `size`, `mod_time`). Only fetch full documents if the ETag changed!
+  ```javascript
+  const { items } = await db.list({ prefix: 'boards/proj-1/cards/', limit: 50 });
+  ```
+
+---
+
+## 5. Collaboration & Sharing (Tree ACL)
+- For invite links and shareable access tokens without server infrastructure, use `TreeACL`:
+  ```javascript
+  import { TreeACL } from '@jaydb/cloud';
+
+  // Generate invite token:
+  const inviteToken = await TreeACL.signInvite({
+    boardId: 'proj-1',
+    role: 'write',
+    inviterName: auth.getUser()?.name || 'Anonymous',
+    expiresInMs: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  // Verify on receipt:
+  const invite = await TreeACL.verifyInvite(inviteToken);
+  ```
+
+---
+
+## 6. TypeScript Types
+Always provide types when interacting with `@jaydb/cloud`:
+```typescript
+interface Card {
+  title: string;
+  status: 'todo' | 'in-progress' | 'done';
+  assignee?: string;
+}
+
+const cardDoc = await db.get<Card>('boards/123/cards/456');
+if (cardDoc) {
+  console.log(cardDoc.data.title); // Type-checked
+}
+```
