@@ -108,8 +108,8 @@ await esbuild.build({
   sourcemap: true,
 });
 
-// 4. Generate GitHub Pages Documentation & Distribution Landing Page (dist/index.html)
-const indexHtml = `<!DOCTYPE html>
+function renderHtml(assetPrefix = '.') {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -370,7 +370,7 @@ const indexHtml = `<!DOCTYPE html>
             <tbody>
               <tr>
                 <td>
-                  <a class="file-name" href="./jaydb-cloud.esm.min.js">jaydb-cloud.esm.min.js</a>
+                  <a class="file-name" href="\${assetPrefix}/jaydb-cloud.esm.min.js">jaydb-cloud.esm.min.js</a>
                   <span class="pill pill--rec">Recommended</span>
                 </td>
                 <td>ESM</td>
@@ -379,7 +379,7 @@ const indexHtml = `<!DOCTYPE html>
               </tr>
               <tr>
                 <td>
-                  <a class="file-name" href="./jaydb-cloud.min.js">jaydb-cloud.min.js</a>
+                  <a class="file-name" href="\${assetPrefix}/jaydb-cloud.min.js">jaydb-cloud.min.js</a>
                 </td>
                 <td>IIFE / UMD</td>
                 <td>~12.8 KB</td>
@@ -387,7 +387,7 @@ const indexHtml = `<!DOCTYPE html>
               </tr>
               <tr>
                 <td>
-                  <a class="file-name" href="./jaydb-cloud.esm.js">jaydb-cloud.esm.js</a>
+                  <a class="file-name" href="\${assetPrefix}/jaydb-cloud.esm.js">jaydb-cloud.esm.js</a>
                 </td>
                 <td>ESM</td>
                 <td>27.6 KB</td>
@@ -395,7 +395,7 @@ const indexHtml = `<!DOCTYPE html>
               </tr>
               <tr>
                 <td>
-                  <a class="file-name" href="./index.d.ts">index.d.ts</a>
+                  <a class="file-name" href="\${assetPrefix}/index.d.ts">index.d.ts</a>
                 </td>
                 <td>Types</td>
                 <td>5.3 KB</td>
@@ -416,7 +416,7 @@ const indexHtml = `<!DOCTYPE html>
 &lt;<span class="code-keyword">script</span> <span class="code-fn">type</span>=<span class="code-string">"importmap"</span>&gt;
 {
   <span class="code-string">"imports"</span>: {
-    <span class="code-string">"@jaydb/cloud"</span>: <span class="code-string">"https://jaydb-cloud.github.io/jaydb-cloud-sdk/jaydb-cloud.esm.min.js"</span>
+    <span class="code-string">"@jaydb/cloud"</span>: <span class="code-string">"https://jaydb-cloud.github.io/jaydb-cloud-sdk/dist/jaydb-cloud.esm.min.js"</span>
   }
 }
 &lt;/<span class="code-keyword">script</span>&gt;
@@ -458,7 +458,7 @@ const indexHtml = `<!DOCTYPE html>
 
   <script type="module">
     try {
-      const { JayDB, Auth, TreeACL } = await import('./jaydb-cloud.esm.min.js');
+      const { JayDB, Auth, TreeACL } = await import('\${assetPrefix}/jaydb-cloud.esm.min.js');
       if (JayDB && Auth && TreeACL) {
         document.getElementById('live-text').textContent = '✓ Live SDK Loaded: jaydb-cloud.esm.min.js ready (JayDB, Auth, TreeACL available)';
       }
@@ -469,8 +469,15 @@ const indexHtml = `<!DOCTYPE html>
 </body>
 </html>
 `;
+}
 
-fs.writeFileSync(path.join(distDir, 'index.html'), indexHtml, 'utf8');
+// Generate in dist/ (where assets are in same folder)
+fs.writeFileSync(path.join(distDir, 'index.html'), renderHtml('.'), 'utf8');
+fs.writeFileSync(path.join(distDir, '.nojekyll'), '', 'utf8');
+
+// Generate at root (where assets are in ./dist)
+fs.writeFileSync(path.join(rootDir, 'index.html'), renderHtml('./dist'), 'utf8');
+fs.writeFileSync(path.join(rootDir, '.nojekyll'), '', 'utf8');
 
 console.log('Build completed successfully!');
 console.log('Generated in dist/:');

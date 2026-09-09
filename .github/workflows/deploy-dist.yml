@@ -59,3 +59,5 @@ jobs:
         if: steps.pages-config.outcome == 'success'
         id: deployment
         uses: actions/deploy-pages@v4
+        timeout-minutes: 2
+        continue-on-error: true
